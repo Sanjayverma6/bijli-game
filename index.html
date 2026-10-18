@@ -1,0 +1,321 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bijli Game - Sanjay Verma</title>
+<style>
+:root{--bg:#071426;--panel:#112741;--tile:#1c3855;--gold:#ffd45a;--green:#43e0a0}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#1b456c,var(--bg) 75%);color:#f3f7ff;font-family:Arial,sans-serif;min-height:100vh}
+header{text-align:center;padding:22px 10px}
+header h1{margin:0;font-size:clamp(28px,6vw,42px)}
+header p,.note{color:#b4c8dc}
+main{width:min(900px,94%);margin:auto}
+.panel{background:var(--panel);border:1px solid #345674;border-radius:20px;padding:18px;margin:12px 0;box-shadow:0 12px 30px #0003}
+.hidden{display:none!important}
+button,select,input{font:inherit;border-radius:11px;padding:12px}
+button{cursor:pointer;font-weight:bold;border:1px solid #496783}
+button:disabled{opacity:.35;cursor:not-allowed}
+.primary{background:var(--gold);color:#18253a;border:0}
+.secondary{background:#244666;color:white}
+.menu-buttons{display:grid;gap:11px;max-width:430px;margin:20px auto}
+.menu-buttons button{font-size:16px;padding:15px}
+.controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:15px 0}
+.stat{background:#081a2d;border-radius:12px;text-align:center;padding:10px 3px;font-size:13px}
+.stat strong{display:block;color:var(--gold);font-size:21px;margin-top:5px}
+#board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:min(100%,440px);margin:18px auto}
+.tile{aspect-ratio:1;position:relative;overflow:hidden;background:var(--tile);border:1px solid #45617e;border-radius:12px;padding:0;display:flex;align-items:center;justify-content:center}
+.tile.powered{background:#145844;border-color:var(--green);box-shadow:inset 0 0 18px #35e3a044}
+.tile.source{background:#64511a;border-color:var(--gold)}
+.tile.house{background:#24466a}
+.tile.empty{background:#091a2b;border-style:dashed;opacity:.35}
+.tile svg{width:100%;height:100%;display:block;overflow:visible;pointer-events:none}
+.wire-line{stroke:#c4d5e5;stroke-width:12;stroke-linecap:round;fill:none}
+.powered .wire-line{stroke:var(--green);filter:drop-shadow(0 0 3px #43e0a0)}
+.tile .symbol{font-size:clamp(25px,7vw,38px);position:relative;z-index:2}
+#status{text-align:center;min-height:26px;line-height:1.5;color:#c3d6e8}
+#winBox{background:#103e39;border:1px solid #43b98f;border-radius:15px;padding:15px;text-align:center}
+#winBox h3{color:var(--green)}
+.level-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(57px,1fr));gap:7px;max-height:400px;overflow:auto}
+.level-btn{padding:10px 2px;background:#203d5b;color:white}
+.level-btn.done{border-color:var(--green);color:var(--green)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 0;border-bottom:1px solid #34506b}
+select,input{background:#203d5b;color:white;border:1px solid #496783;max-width:100%}
+footer{text-align:center;color:#9ab0c6;padding:20px;font-size:13px}
+footer b{color:var(--gold)}
+@media(max-width:440px){.panel{padding:13px}.stats{grid-template-columns:repeat(2,1fr)}#board{gap:5px}.tile{border-radius:8px}}
+</style>
+</head>
+<body>
+<header>
+<h1>⚡ Bijli Game</h1>
+<p>तार जोड़ो • घर रोशन करो • 500 लेवल पार करो</p>
+</header>
+
+<main>
+<section id="menu" class="panel">
+<h2 style="text-align:center">🏡 स्वागत है!</h2>
+<p style="text-align:center" class="note">बिजली के तार जोड़कर सभी घरों को रोशन करो।</p>
+<div class="menu-buttons">
+<button class="primary" onclick="startLevel(unlocked-1)">▶ गेम शुरू करें</button>
+<button class="secondary" onclick="showLevels()">🗺️ 500 लेवल</button>
+<button class="secondary" onclick="showSettings()">⚙️ सेटिंग्स</button>
+<button class="secondary" onclick="showInstructions()">📖 कैसे खेलें?</button>
+</div>
+<p id="progressText" style="text-align:center" class="note"></p>
+</section>
+
+<section id="levels" class="panel hidden">
+<h2>🗺️ लेवल चुनें</h2>
+<p class="note">अनलॉक हुए लेवल चुनो या नंबर से खोजो।</p>
+<div class="controls">
+<input id="levelSearch" type="number" min="1" max="500" placeholder="लेवल 1–500">
+<button class="primary" onclick="goToLevel()">जाओ</button>
+</div>
+<div id="levelGrid" class="level-grid" style="margin-top:15px"></div>
+<div class="controls"><button class="secondary" onclick="showMenu()">⬅ मेन्यू</button></div>
+</section>
+
+<section id="settings" class="panel hidden">
+<h2>⚙️ सेटिंग्स</h2>
+<div class="setting-row"><span>🔊 साउंड</span><button id="soundButton" class="secondary" onclick="toggleSound()">चालू</button></div>
+<div class="setting-row"><span>🎯 कठिनाई</span><select id="difficulty" onchange="saveSettings()"><option value="easy">आसान</option><option value="normal">सामान्य</option><option value="hard">मुश्किल</option></select></div>
+<div class="setting-row"><span>🎨 थीम</span><select id="theme" onchange="saveSettings()"><option value="blue">Ocean Blue</option><option value="purple">Royal Purple</option><option value="green">Forest Green</option></select></div>
+<p id="settingsProgress" class="note"></p>
+<button class="secondary" onclick="resetProgress()">प्रोग्रेस रीसेट करें</button>
+<div class="controls"><button class="primary" onclick="showMenu()">सेव करके वापस जाएँ</button></div>
+</section>
+
+<section id="instructions" class="panel hidden">
+<h2>📖 खेलने का तरीका</h2>
+<p>⚡ बिजली के स्रोत से तार जोड़ो।</p>
+<p>🏠 सभी घरों तक बिजली पहुँचाओ।</p>
+<p>🔄 तार वाले बॉक्स पर क्लिक करके तार घुमाओ।</p>
+<p>🟢 हरी लाइन बताती है कि बिजली वहाँ पहुँच चुकी है।</p>
+<p>⏱️ समय खत्म होने से पहले लेवल पूरा करो।</p>
+<div class="controls"><button class="primary" onclick="startLevel(unlocked-1)">खेलें</button><button class="secondary" onclick="showMenu()">मेन्यू</button></div>
+</section>
+
+<section id="game" class="panel hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+<div><h2 id="levelTitle" style="margin:0">लेवल 1</h2><p id="levelDesc" class="note"></p></div>
+<button class="secondary" onclick="showMenu()">🏠 मेन्यू</button>
+</div>
+<div class="stats">
+<div class="stat">⏱️ समय<strong id="timer">60</strong></div>
+<div class="stat">⭐ स्कोर<strong id="score">0</strong></div>
+<div class="stat">🔄 चालें<strong id="moves">0</strong></div>
+<div class="stat">🏠 घर<strong id="homes">0/0</strong></div>
+</div>
+<div id="board"></div>
+<p id="status" aria-live="polite">तार घुमाकर बिजली जोड़ो!</p>
+<div id="winBox" class="hidden">
+<h3>🎉 सभी घर रोशन हो गए!</h3>
+<p id="winDetails"></p>
+<div class="controls"><button id="nextBtn" class="primary" onclick="nextLevel()">अगला लेवल ➜</button><button class="secondary" onclick="showLevels()">लेवल चुनें</button></div>
+</div>
+<div class="controls">
+<button class="secondary" onclick="restartLevel()">🔄 फिर से खेलें</button>
+<button class="secondary" onclick="showSettings()">⚙️ सेटिंग्स</button>
+</div>
+</section>
+</main>
+<footer>⚡ Bijli Game<br><br>Created with ❤️ by <b>Sanjay Verma</b></footer>
+
+<script>
+const templates=[
+{paths:[[[0,0],[0,1],[0,2],[0,3]],[[0,0],[0,1],[0,2],[1,2],[2,2],[3,2],[3,3]]],houses:[[0,3],[3,3]]},
+{paths:[[[0,0],[0,1],[1,1],[1,2],[1,3]],[[0,0],[0,1],[1,1],[2,1],[3,1],[3,2],[3,3]]],houses:[[1,3],[3,3]]},
+{paths:[[[0,0],[0,1],[0,2],[0,3]],[[0,0],[0,1],[0,2],[1,2],[1,3],[2,3],[3,3]],[[0,0],[0,1],[0,2],[1,2],[2,2],[2,1],[3,1]]],houses:[[0,3],[3,3],[3,1]]},
+{paths:[[[0,0],[0,1],[0,2],[0,3]],[[0,0],[0,1],[1,1],[2,1],[3,1],[3,2],[3,3]],[[0,0],[0,1],[1,1],[1,2],[1,3]]],houses:[[0,3],[3,3],[1,3]]},
+{paths:[[[0,0],[0,1],[0,2],[0,3]],[[0,0],[0,1],[1,1],[1,2],[1,3],[2,3]],[[0,0],[0,1],[1,1],[2,1],[3,1]],[[0,0],[0,1],[1,1],[1,2],[2,2],[3,2],[3,3]]],houses:[[0,3],[2,3],[3,1],[3,3]]}
+];
+let level=0,cells=[],timerValue=60,moves=0,score=0,timerId=null,running=false,audioCtx=null;
+let settings=JSON.parse(localStorage.getItem("bijliSettings")||'{"sound":true,"difficulty":"normal","theme":"blue"}');
+let soundOn=settings.sound!==false;
+let unlocked=Math.max(1,Math.min(500,Number(localStorage.getItem("bijliUnlocked")||1)));
+let completed=JSON.parse(localStorage.getItem("bijliCompleted")||"[]");
+const $=id=>document.getElementById(id);
+function layout(n){return templates[(n-1)%templates.length]}
+function showOnly(id){["menu","levels","settings","instructions","game"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+function stopTimer(){if(timerId){clearInterval(timerId);timerId=null}running=false}
+function showMenu(){stopTimer();showOnly("menu");updateProgress()}
+function showInstructions(){stopTimer();showOnly("instructions")}
+function showSettings(){stopTimer();showOnly("settings");$("difficulty").value=settings.difficulty;$("theme").value=settings.theme;updateSettings()}
+function showLevels(){stopTimer();showOnly("levels");renderLevels()}
+function updateProgress(){
+ $("progressText").textContent=`अनलॉक: ${unlocked}/500 • पूरे किए: ${completed.length}/500`;
+ $("settingsProgress").textContent=`${completed.length} लेवल पूरे हुए। अगला अनलॉक लेवल: ${unlocked}`;
+}
+function renderLevels(){
+ const grid=$("levelGrid");grid.innerHTML="";
+ for(let n=1;n<=500;n++){
+  const b=document.createElement("button");
+  b.className="level-btn"+(completed.includes(n)?" done":"");
+  b.disabled=n>unlocked;b.textContent=(completed.includes(n)?"✓ ":"")+n;
+  b.onclick=()=>startLevel(n-1);grid.appendChild(b);
+ }
+}
+function goToLevel(){
+ const n=Number($("levelSearch").value);
+ if(!Number.isInteger(n)||n<1||n>500){alert("1 से 500 तक का नंबर डालो।");return}
+ if(n>unlocked){alert("पहले पिछले लेवल पूरे करो।");return}
+ startLevel(n-1);
+}
+function key(r,c){return r+","+c}
+function direction(a,b){
+ const dr=b[0]-a[0],dc=b[1]-a[1];
+ if(dr===-1&&dc===0)return 0;if(dr===0&&dc===1)return 1;
+ if(dr===1&&dc===0)return 2;if(dr===0&&dc===-1)return 3;
+ throw Error("Invalid path");
+}
+function rotatePorts(ports,rot){return ports.map(p=>(p+rot)%4)}
+function isStraight(p){return p.length===2&&((p.includes(0)&&p.includes(2))||(p.includes(1)&&p.includes(3)))}
+function makePuzzle(n){
+ const map=new Map(),lv=layout(n);
+ function node(r,c){const k=key(r,c);if(!map.has(k))map.set(k,{r,c,base:[],rot:0,type:"wire"});return map.get(k)}
+ lv.paths.forEach(path=>{
+  for(let i=0;i<path.length-1;i++){
+   const a=path[i],b=path[i+1],d=direction(a,b),x=node(...a),y=node(...b);
+   if(!x.base.includes(d))x.base.push(d);
+   if(!y.base.includes((d+2)%4))y.base.push((d+2)%4);
+  }
+ });
+ const hs=new Set(lv.houses.map(([r,c])=>key(r,c)));let wi=0;
+ map.forEach(c=>{
+  c.base.sort((a,b)=>a-b);
+  if(c.r===0&&c.c===0){c.type="source";c.rot=0}
+  else if(hs.has(key(c.r,c.c))){c.type="house";c.rot=0}
+  else{
+   c.type="wire";let rot=((wi*7+n*3)%3)+1;
+   if(isStraight(c.base)&&rot===2)rot=1;
+   c.rot=rot;wi++;
+  }
+ });
+ return map;
+}
+function startLevel(index){
+ index=Math.max(0,Math.min(499,index));
+ if(index+1>unlocked){showLevels();return}
+ stopTimer();level=index;
+ const map=makePuzzle(level+1),lv=layout(level+1);
+ cells=Array.from({length:16},(_,i)=>{
+  const r=Math.floor(i/4),c=i%4,v=map.get(key(r,c));
+  return v?{...v}:{r,c,type:"empty",base:[],rot:0};
+ });
+ const base=Math.max(35,85-Math.floor(level/10));
+ timerValue=Math.round(base*(settings.difficulty==="easy"?1.35:settings.difficulty==="hard"?.7:1));
+ moves=0;score=0;running=true;
+ $("levelTitle").textContent=`लेवल ${level+1} / 500`;
+ $("levelDesc").textContent=`${lv.houses.length} घरों को बिजली दो`;
+ $("winBox").classList.add("hidden");$("nextBtn").classList.toggle("hidden",level===499);
+ showOnly("game");renderBoard();updateStats();checkPower();
+ if(running)timerId=setInterval(()=>{if(!running)return;timerValue--;updateStats();if(timerValue<=0)loseGame()},1000);
+}
+function restartLevel(){startLevel(level)}
+function ports(c){return c.type==="empty"?[]:c.type==="source"||c.type==="house"?c.base:rotatePorts(c.base,c.rot)}
+function svgFor(c){
+ const p=ports(c),ends=[[50,0],[100,50],[50,100],[0,50]];
+ let lines=p.map(d=>`<line class="wire-line" x1="50" y1="50" x2="${ends[d][0]}" y2="${ends[d][1]}"/>`).join("");
+ return `<svg viewBox="0 0 100 100" aria-hidden="true">${lines}<circle cx="50" cy="50" r="7" fill="currentColor"/></svg>`;
+}
+function renderBoard(){
+ const board=$("board");board.innerHTML="";
+ cells.forEach((c,i)=>{
+  const b=document.createElement("button");b.className="tile "+c.type;
+  if(c.type==="empty"){b.disabled=true}
+  else if(c.type==="source"){b.innerHTML='<span class="symbol">⚡</span>'}
+  else if(c.type==="house"){b.innerHTML='<span class="symbol">🏠</span>'}
+  else{b.innerHTML=svgFor(c);b.onclick=()=>rotateCell(i);b.setAttribute("aria-label","तार घुमाएँ")}
+  board.appendChild(b);
+ });
+}
+function rotateCell(i){
+ if(!running)return;const c=cells[i];if(c.type!=="wire")return;
+ c.rot=(c.rot+1)%4;moves++;tone(360,.05);renderBoard();checkPower();updateStats();
+}
+function neighbors(c){
+ const ds=[[-1,0],[0,1],[1,0],[0,-1]],out=[];
+ ports(c).forEach(d=>{
+  const r=c.r+ds[d][0],col=c.c+ds[d][1];
+  if(r<0||r>=4||col<0||col>=4)return;
+  const other=cells[r*4+col];
+  if(other.type!=="empty"&&ports(other).includes((d+2)%4))out.push(other);
+ });
+ return out;
+}
+function poweredCells(){
+ const src=cells.find(c=>c.type==="source"),seen=new Set(),q=[];
+ if(!src)return seen;
+ q.push(src);seen.add(key(src.r,src.c));
+ while(q.length){const c=q.shift();neighbors(c).forEach(v=>{const k=key(v.r,v.c);if(!seen.has(k)){seen.add(k);q.push(v)}})}
+ return seen;
+}
+function checkPower(){
+ const seen=poweredCells(),lv=layout(level+1);let count=0;
+ cells.forEach((c,i)=>{
+  const el=$("board").children[i];if(!el)return;
+  const on=seen.has(key(c.r,c.c));el.classList.toggle("powered",on);
+  if(c.type==="house"&&on)count++;
+ });
+ $("homes").textContent=`${count}/${lv.houses.length}`;
+ $("status").textContent=count===lv.houses.length?"सभी घरों में बिजली पहुँच गई! 🎉":`${count}/${lv.houses.length} घरों में बिजली पहुँची है।`;
+ if(count===lv.houses.length)winGame();
+}
+function updateStats(){$("timer").textContent=timerValue;$("score").textContent=score;$("moves").textContent=moves}
+function winGame(){
+ if(!running)return;stopTimer();
+ score=layout(level+1).houses.length*100+timerValue*2+Math.max(0,100-moves*5);
+ if(!completed.includes(level+1))completed.push(level+1);
+ completed.sort((a,b)=>a-b);unlocked=Math.max(unlocked,Math.min(500,level+2));
+ localStorage.setItem("bijliCompleted",JSON.stringify(completed));
+ localStorage.setItem("bijliUnlocked",String(unlocked));
+ updateStats();updateProgress();
+ $("winDetails").textContent=`स्कोर: ${score} • चालें: ${moves} • बचा समय: ${timerValue} सेकंड`;
+ $("winBox").classList.remove("hidden");
+ $("nextBtn").textContent=level===499?"सभी लेवल पूरे!":"अगला लेवल ➜";
+ $("status").textContent="लेवल पूरा हो गया!";tone(650,.15);
+}
+function loseGame(){if(!running)return;stopTimer();$("status").textContent="⏰ समय खत्म! फिर से कोशिश करो।";tone(180,.25)}
+function nextLevel(){if(level<499)startLevel(level+1);else showLevels()}
+function toggleSound(){soundOn=!soundOn;settings.sound=soundOn;saveSettings();updateSettings();if(soundOn)tone(500,.08)}
+function updateSettings(){$("soundButton").textContent=soundOn?"🔊 चालू":"🔇 बंद"}
+function saveSettings(){
+ settings.difficulty=$("difficulty").value;settings.theme=$("theme").value;settings.sound=soundOn;
+ localStorage.setItem("bijliSettings",JSON.stringify(settings));applyTheme();updateSettings();
+}
+function applyTheme(){
+ const t={
+ blue:["#071426","#112741","#1c3855"],
+ purple:["#160d2c","#291947","#43275f"],
+ green:["#071e1a","#12372d","#205242"]
+ }[settings.theme]||["#071426","#112741","#1c3855"];
+ document.documentElement.style.setProperty("--bg",t[0]);
+ document.documentElement.style.setProperty("--panel",t[1]);
+ document.documentElement.style.setProperty("--tile",t[2]);
+}
+function resetProgress(){
+ if(!confirm("क्या पूरी प्रोग्रेस रीसेट करनी है?"))return;
+ completed=[];unlocked=1;
+ localStorage.setItem("bijliCompleted","[]");localStorage.setItem("bijliUnlocked","1");
+ updateProgress();showLevels();
+}
+function tone(freq,dur){
+ if(!soundOn)return;
+ try{
+  audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==="suspended")audioCtx.resume();
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.frequency.value=freq;g.gain.setValueAtTime(.06,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur);
+ }catch(e){}
+}
+$("difficulty").value=settings.difficulty;$("theme").value=settings.theme;
+applyTheme();updateSettings();updateProgress();
+</script>
+</body>
+</html>
